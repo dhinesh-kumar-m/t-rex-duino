@@ -11,7 +11,9 @@
 #define _SH1106_H_
 
 #define SH1106_I2C_SCL_CLOCK  800000UL
-#define SH1106_I2C_ADDR 0b01111000
+#ifndef SH1106_I2C_ADDR
+#define SH1106_I2C_ADDR 0b01111000 //7-bit address 0x3C shifted left by 1 (AVR TWI convention); override before including this header to change the address
+#endif
 #define SH1106_COMMAND 0x00
 #define SH1106_DATA 0x40
 

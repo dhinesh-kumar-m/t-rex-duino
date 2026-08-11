@@ -11,11 +11,26 @@
 */ 
 
 /* Hardware Connections */
+#if defined(ESP32)
+// -- ESP32 32-pin board + 128x64 I2C SSD1306 OLED --
+// -- Buttons --
+#define JUMP_BUTTON 27 //connect to GND when pressed, uses INPUT_PULLUP
+#define DUCK_BUTTON 26 //connect to GND when pressed, uses INPUT_PULLUP
+
+// -- Display Selection --
+#define LCD_SSD1306 //SSD1306 I2C OLED
+
+// -- Display Connection for SH1106/SSD1306 (I2C, via Wire) --
+#define LCD_I2C_SDA 21
+#define LCD_I2C_SCL 22
+#define LCD_I2C_ADDRESS 0x3C //7-bit I2C address
+
+#else
 // -- Buttons --
 #define JUMP_BUTTON 6
 #define DUCK_BUTTON 5
 
-// -- Display Selection (uncomment ONE of the options) -- 
+// -- Display Selection (uncomment ONE of the options) --
 #define LCD_SSD1309
 //#define LCD_SH1106      //If you see abnormal vertical line at the left edge of the display, select LCD_SSD1306
 //#define LCD_SSD1306     //If you see abnormal vertical line at the right edge of the display, select LCD_SH1106
@@ -30,6 +45,7 @@
 // -- Display Connection for SH1106/SSD1306 --
 //LCD_SH1106_SDA -> A4 (I2C SDA)
 //LCD_SH1106_SCL -> A5 (I2C SCL)
+#endif
 
 /* Misc. Settings */
 //#define AUTO_PLAY //uncomment to enable auto-play mode
@@ -65,6 +81,9 @@
 
 /* Includes */
 #include <EEPROM.h>
+#if defined(ESP32)
+#include <esp_system.h> //esp_random()
+#endif
 #include "array.h"
 #include "TrexPlayer.h"
 #include "Ground.h"
@@ -74,6 +93,9 @@
 
 /* Defines and globals */
 #define EEPROM_HI_SCORE 16 //2 bytes
+#if defined(ESP32)
+#define EEPROM_SIZE 32 //ESP32 EEPROM emulation requires an explicit size for EEPROM.begin()
+#endif
 #define LCD_BYTE_SZIE (LCD_WIDTH*LCD_HEIGHT/8)
 
 #ifdef VIRTUAL_WIDTH_BUFFER_COLS
@@ -97,6 +119,9 @@
   #include "SSD1309.h"
   static SSD1309<SPIClass> lcd(SPI, LCD_SSD1309_CS, LCD_SSD1309_DC, LCD_SSD1309_RESET, LCD_BYTE_SZIE);
 #else
+  #if defined(ESP32)
+    #define SH1106_I2C_ADDR (LCD_I2C_ADDRESS << 1) //SH1106.h expects the AVR-style pre-shifted address
+  #endif
   #include "I2C.h"
   #include "SH1106.h"
   I2C i2c;
@@ -116,6 +141,7 @@ bool isPressedDuck() {
   return !digitalRead(DUCK_BUTTON);
 }
 
+#if !defined(ESP32)
 uint8_t randByte() {
   static uint16_t c = 0xA7E2;
   c = (c << 1) | (c >> 15);
@@ -124,6 +150,7 @@ uint8_t randByte() {
   c = analogRead(A2) ^ analogRead(A3) ^ analogRead(A4) ^ analogRead(A5) ^ analogRead(A6) ^ analogRead(A7) ^ c;
   return c;
 }
+#endif
 
 /* Main Functions */
 
@@ -261,7 +288,11 @@ void gameLoop(uint16_t &hiScore) {
 #endif
 
     //throttle
+#if defined(ESP32)
+    while(millis() - prvT < frameTime) yield(); //yield to the RTOS scheduler so the idle task can feed the task watchdog
+#else
     while(millis() - prvT < frameTime);
+#endif
     prvT = millis();
   } 
 }
@@ -280,12 +311,23 @@ void setup() {
   pinMode(JUMP_BUTTON, INPUT_PULLUP);
   pinMode(DUCK_BUTTON, INPUT_PULLUP);
   Serial.begin(250000);
+#if defined(ESP32)
+  Wire.begin(LCD_I2C_SDA, LCD_I2C_SCL);
+  EEPROM.begin(EEPROM_SIZE); //ESP32 EEPROM emulation must be begin()'d with a size before use
+#endif
   lcd.begin();
   spalshScreen();
   lcd.setAddressingMode(LCD_IF_VIRTUAL_WIDTH(lcd.VerticalAddressingMode, lcd.HorizontalAddressingMode));
+#if defined(ESP32)
+  srand(esp_random()); //hardware TRNG, replaces the AVR floating-analogRead entropy source
+#else
   srand((randByte()<<8) | randByte());
+#endif
 #ifdef RESET_HI_SCORE
   EEPROM.put(EEPROM_HI_SCORE, hiScore);
+#if defined(ESP32)
+  EEPROM.commit();
+#endif
 #endif
   EEPROM.get(EEPROM_HI_SCORE, hiScore);
   if(hiScore == 0xFFFF) hiScore = 0;
@@ -296,6 +338,9 @@ void loop() {
     firstStart = false;
     gameLoop(hiScore);
     EEPROM.put(EEPROM_HI_SCORE, hiScore);
+#if defined(ESP32)
+    EEPROM.commit(); //ESP32 EEPROM emulation buffers writes in RAM until committed to flash
+#endif
     //wait until the jump button is released
     while(isPressedJump()) delay(100);
     delay(500);

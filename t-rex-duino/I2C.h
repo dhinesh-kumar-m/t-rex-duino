@@ -10,6 +10,46 @@
 #ifndef _I2C_CALSS_H_
 #define _I2C_CALSS_H_
 
+#if defined(ESP32)
+
+/* ESP32 I2C implementation using the Wire library.
+ * Mirrors the AVR TWI interface below (start/write/stop/init/deinit)
+ * so SH1106.h can drive either backend unchanged. */
+#include <Wire.h>
+
+struct I2C {
+  I2C(TwoWire &wire = Wire) : wire(wire) {}
+
+  void init(const uint32_t clock) {
+    wire.setClock(clock);
+  }
+
+  void deinit(void) {}
+
+  uint8_t start(uint8_t address) {
+    //address here is the AVR-style 8-bit address (7-bit addr << 1); Wire wants the 7-bit form
+    wire.beginTransmission(address >> 1);
+    return 0;
+  }
+
+  void stop(void) {
+    wire.endTransmission();
+  }
+
+  uint8_t write(uint8_t data) {
+    wire.write(data);
+    return 0;
+  }
+
+  uint8_t readAck(void) { return 0; }
+  uint8_t readNak(void) { return 0; }
+
+private:
+  TwoWire &wire;
+};
+
+#else
+
 #include <compat/twi.h>
 
 struct I2C {
@@ -122,5 +162,6 @@ struct I2C {
   }
 };
 
+#endif
 
 #endif

@@ -125,13 +125,13 @@ struct BitCanvas {
     if(sX0 >= width || sX1 <= 0 || sY0 >= height || sY1 <= 0) return;
 
     //cycle on canvas
-    const uint8_t Xto = min(sX1, width);
-    const uint8_t Yto = min(sY1, height);
+    const uint8_t Xto = min(sX1, (int16_t)width);
+    const uint8_t Yto = min(sY1, (int16_t)height);
 
     const uint8_t bitOffset = (sY0%8) + (sY0%8 < 0? 8 : 0);
     const uint8_t bitmapByteHeight = (sprite.bitmap->height + 7) / 8;
     
-    for(uint8_t y = max(sY0, 0); y < 8*((Yto + 7)/8); y += 8) {
+    for(uint8_t y = max(sY0, (int16_t)0); y < 8*((Yto + 7)/8); y += 8) {
       const uint8_t yByte = y/8;
       const uint8_t sy = y - sY0;
       const uint8_t syByte = (sy + 7)/8; //allowed to be equal to bitmapByteHeight
@@ -155,7 +155,7 @@ struct BitCanvas {
           ? sprite.bitmap->data + (syByte-1)*sprite.bitmap->width
           : 0;
 
-      for(uint8_t x = max(sX0, 0); x < Xto; ++x) {
+      for(uint8_t x = max(sX0, (int16_t)0); x < Xto; ++x) {
         //render 8 pixels
         const uint8_t sx = x - sX0;
         uint8_t& canvasByte = bitmap_yw[x];
@@ -218,10 +218,10 @@ struct CollisionDetector {
     if(sX0 >= width || sX1 <= 0 || sY0 >= height || sY1 <= 0) return false; //no rectangle intersection
     
     //cycle on sprite 1
-    const uint8_t Xto = min(sX1, width);
-    const uint8_t Yto = min(sY1, height);
+    const uint8_t Xto = min(sX1, (int16_t)width);
+    const uint8_t Yto = min(sY1, (int16_t)height);
     
-    for(uint8_t y = max(sY0, 0); y < Yto; ++y) {
+    for(uint8_t y = max(sY0, (int16_t)0); y < Yto; ++y) {
       const uint8_t yByte = y/8;
       const uint8_t yBit = y%8;
       const uint8_t sy = y - sY0;
@@ -231,7 +231,7 @@ struct CollisionDetector {
       const flash_uint8_t* const s1data = s1.bitmap->data + yByte*width;
       const flash_uint8_t* const s2data = s2.bitmap->data + syByte*s2.bitmap->width;
       
-      for(uint8_t x = max(sX0, 0); x < Xto; ++x) {
+      for(uint8_t x = max(sX0, (int16_t)0); x < Xto; ++x) {
         const uint8_t sx = x - sX0;
         if((flashByte(s1data, x) & (1<<yBit)) && (flashByte(s2data, sx) & (1<<syBit))) return true;
       }
